@@ -2,69 +2,69 @@
 
 Compose LLM prompts as directed acyclic graphs.
 
-## Motivation
-
-Prompt engineering gets messy fast. You start with a simple template, then add context injection, then conditional routing, then transforms between steps... before you know it you have spaghetti string concatenation everywhere.
-
-prompt-graph treats prompt composition as a data flow problem. Each step is a node in a DAG, data flows through edges, and the executor handles orchestration.
-
-Heavily influenced by functional programming patterns and dataflow architectures.
-
-## Install
-
-```bash
-npm install prompt-graph
 ```
+  [context] ──→ [transform] ──→ [format]
+                     ↑
+  [user_input] ──────┘
+```
+
+## The idea
+
+Prompt engineering is fundamentally a **data flow** problem. You have inputs (context, user query, system instructions), you have transforms (formatting, filtering, combining), and you have outputs (the final prompt sent to the LLM).
+
+Most codebases handle this with string concatenation. Template literals everywhere. Conditional blocks that grow and grow until nobody understands what the final prompt looks like.
+
+prompt-graph makes the flow explicit. Each step is a **node**. Data moves through **edges**. The graph is validated, executed in topological order, and — crucially — each node can be tested in isolation.
+
+If you've worked with dataflow programming or stream processing, this will feel familiar.
 
 ## Quick start
 
 ```typescript
-import { PromptGraph, createTemplateNode, createEdge, GraphExecutor } from 'prompt-graph'
+import { PromptGraph, createTemplateNode, createTransformNode, createEdge, GraphExecutor } from 'prompt-graph'
 
 const graph = new PromptGraph()
 
 graph.addNode(createTemplateNode('system', 'You are a {{role}}. {{instructions}}'))
-graph.addNode(createTemplateNode('user', '{{system_prompt}}\n\nUser: {{question}}'))
+graph.addNode(createTransformNode('format', (input) => ({
+  finalPrompt: `${input.prompt}\n\nUser: ${input.question}`
+})))
 
-graph.addEdge(createEdge('system', 'user', {
-  mapFn: (data) => ({ system_prompt: data.prompt, question: data.question })
-}))
+graph.addEdge(createEdge('system', 'format'))
 graph.setEntry('system')
 
 const executor = new GraphExecutor(graph)
 const results = await executor.execute({
-  role: 'helpful assistant',
-  instructions: 'Be concise.',
-  question: 'What is a DAG?'
+  role: 'code reviewer',
+  instructions: 'Be concise and direct.',
+  question: 'Review this function for bugs.'
 })
 ```
 
 ## Node types
 
-- **Template**: String interpolation with `{{variable}}` syntax
-- **Transform**: Custom function that transforms data between nodes
-- **Conditional**: Routes to different branches based on input
+**Template** — String interpolation with `{{variable}}` syntax. Supports defaults: `{{name | stranger}}`.
 
-## Features
+**Transform** — Arbitrary function. Takes the accumulated data, returns modified data. This is where you put business logic.
 
-- Cycle detection
-- Topological sort execution
-- Default values in templates (`{{var | default}}`)
-- Edge-level data mapping
-- Execution hooks for logging/debugging
+**Conditional** — Routes execution to different branches based on input. The condition function returns a label that matches an edge.
 
-## Why a DAG?
+## Design decisions
 
-Because prompt chains are just a special case of a DAG (a linear one). But real-world prompt workflows have branching, merging, and conditional logic. A DAG models all of these naturally.
+**Why a DAG and not a simple chain?**
+Chains are just DAGs with no branching. Real prompt workflows have conditional logic (route based on language, complexity, user type), merging (combine results from parallel paths), and shared inputs. A DAG handles all of these.
 
-Also - having an explicit graph means you can visualize it, validate it, and test individual nodes in isolation.
+**Why not just use LangChain / LlamaIndex?**
+Those are frameworks. This is a pattern. prompt-graph doesn't know anything about LLMs, APIs, or vector stores. It just composes prompts. Use it inside whatever framework you want, or use it standalone.
 
-## TODO
+**Why explicit graphs instead of function composition?**
+Because you can validate a graph before executing it. Cycle detection, missing variable checks, dependency analysis — all possible because the structure is data, not code.
 
-- [ ] Parallel node execution where possible
-- [ ] Serialize/deserialize graphs to JSON
-- [ ] Visual graph editor (web UI)
-- [ ] Built-in retry/fallback nodes
+## API
+
+The full API is small: `PromptGraph`, `GraphExecutor`, three node constructors (`createTemplateNode`, `createTransformNode`, `createConditionalNode`), and `createEdge`. Plus utilities for `topologicalSort`, `detectCycle`, and template `interpolate`/`extractVariables`.
+
+See the `examples/` directory for chain and branching patterns.
 
 ## License
 
