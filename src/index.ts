@@ -1,3 +1,9 @@
-// prompt-graph
-// compose prompts as DAGs
-export {}
+export { PromptGraph } from './graph'
+export { createTemplateNode, createTransformNode, createConditionalNode } from './node'
+export type { PromptNode, NodeType } from './node'
+export { createEdge } from './edge'
+export type { Edge } from './edge'
+export { GraphExecutor } from './executor'
+export type { ExecutionResult, ExecutorOptions } from './executor'
+export { interpolate, extractVariables, validateVariables } from './templates'
+export { topologicalSort, detectCycle } from './utils'
